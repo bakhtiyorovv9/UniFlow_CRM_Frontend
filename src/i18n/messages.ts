@@ -1,0 +1,127 @@
+import { adminEn, adminRu, adminUz } from './admin-messages';
+import { groupEn, groupRu, groupUz } from './group-messages';
+import { notifyEn, notifyRu, notifyUz } from './notify-messages';
+import { studentEn, studentRu, studentUz } from './student-messages';
+import { teacherEn, teacherRu, teacherUz } from './teacher-messages';
+
+export const LANGUAGES = ['uz', 'ru', 'en'] as const;
+
+export type Language = (typeof LANGUAGES)[number];
+
+const authUz = {
+  'brand.title': "O'quv markazingizni bitta oynadan boshqaring",
+  'brand.subtitle': 'Guruhlar, darslar, davomat va uyga vazifalar — barchasi bir joyda.',
+  'brand.roles': "Admin, o'qituvchi va talaba uchun alohida rollar.",
+  'login.title': 'Xush kelibsiz',
+  'login.subtitle': 'Hisobingizga kiring va ishni davom ettiring',
+  'login.identifier': 'Email yoki telefon raqam',
+  'login.identifierPlaceholder': 'email@example.com yoki +998 90 123 45 67',
+  'login.password': 'Parol',
+  'login.showPassword': "Parolni ko'rsatish",
+  'login.hidePassword': 'Parolni yashirish',
+  'login.remember': 'Meni eslab qol',
+  'login.submit': 'Kirish',
+  'login.submitting': 'Kirilmoqda...',
+  'validation.loginRequired': 'Email yoki telefon raqamini kiriting',
+  'validation.loginInvalid': "Email yoki telefon raqami noto'g'ri formatda",
+  'validation.emailInvalid': "Email noto'g'ri formatda",
+  'validation.passwordMin': "Parol kamida 6 ta belgidan iborat bo'lishi kerak",
+  'error.invalidCredentials': "Login yoki parol noto'g'ri",
+  'error.inactive': 'Akkauntingiz faol emas. Administratorga murojaat qiling',
+  'error.network': "Serverga ulanib bo'lmadi. Keyinroq qayta urinib ko'ring",
+  'error.unknown': "Kutilmagan xatolik yuz berdi. Qayta urinib ko'ring",
+  'common.language': 'Til',
+  'common.toggleTheme': "Mavzuni o'zgartirish",
+  'common.logout': 'Chiqish',
+  'common.loading': 'Yuklanmoqda...',
+  'home.greeting': 'Salom, {name}',
+  'home.placeholder': "Boshqaruv paneli shu yerda bo'ladi.",
+  'role.SUPERADMIN': 'Super admin',
+  'role.ADMIN': 'Admin',
+  'role.TEACHER': "O'qituvchi",
+  'role.STUDENT': 'Talaba',
+};
+
+const uz = { ...authUz, ...adminUz, ...groupUz, ...notifyUz, ...teacherUz, ...studentUz };
+
+export type MessageKey = keyof typeof uz;
+
+const ru: Record<MessageKey, string> = {
+  ...adminRu,
+  ...groupRu,
+  ...notifyRu,
+  ...teacherRu,
+  ...studentRu,
+  'brand.title': 'Управляйте учебным центром из одного окна',
+  'brand.subtitle': 'Группы, уроки, посещаемость и домашние задания — всё в одном месте.',
+  'brand.roles': 'Отдельные роли для администратора, преподавателя и студента.',
+  'login.title': 'Добро пожаловать',
+  'login.subtitle': 'Войдите в аккаунт и продолжите работу',
+  'login.identifier': 'Email или номер телефона',
+  'login.identifierPlaceholder': 'email@example.com или +998 90 123 45 67',
+  'login.password': 'Пароль',
+  'login.showPassword': 'Показать пароль',
+  'login.hidePassword': 'Скрыть пароль',
+  'login.remember': 'Запомнить меня',
+  'login.submit': 'Войти',
+  'login.submitting': 'Вход...',
+  'validation.loginRequired': 'Введите email или номер телефона',
+  'validation.loginInvalid': 'Неверный формат email или номера телефона',
+  'validation.emailInvalid': 'Неверный формат email',
+  'validation.passwordMin': 'Пароль должен содержать не менее 6 символов',
+  'error.invalidCredentials': 'Неверный логин или пароль',
+  'error.inactive': 'Ваш аккаунт неактивен. Обратитесь к администратору',
+  'error.network': 'Не удалось подключиться к серверу. Попробуйте позже',
+  'error.unknown': 'Произошла непредвиденная ошибка. Попробуйте ещё раз',
+  'common.language': 'Язык',
+  'common.toggleTheme': 'Сменить тему',
+  'common.logout': 'Выйти',
+  'common.loading': 'Загрузка...',
+  'home.greeting': 'Привет, {name}',
+  'home.placeholder': 'Здесь будет панель управления.',
+  'role.SUPERADMIN': 'Супер админ',
+  'role.ADMIN': 'Админ',
+  'role.TEACHER': 'Преподаватель',
+  'role.STUDENT': 'Студент',
+};
+
+const en: Record<MessageKey, string> = {
+  ...adminEn,
+  ...groupEn,
+  ...notifyEn,
+  ...teacherEn,
+  ...studentEn,
+  'brand.title': 'Run your learning center from a single window',
+  'brand.subtitle': 'Groups, lessons, attendance and homework — all in one place.',
+  'brand.roles': 'Separate roles for admins, teachers and students.',
+  'login.title': 'Welcome back',
+  'login.subtitle': 'Sign in to your account to continue',
+  'login.identifier': 'Email or phone number',
+  'login.identifierPlaceholder': 'email@example.com or +998 90 123 45 67',
+  'login.password': 'Password',
+  'login.showPassword': 'Show password',
+  'login.hidePassword': 'Hide password',
+  'login.remember': 'Remember me',
+  'login.submit': 'Sign in',
+  'login.submitting': 'Signing in...',
+  'validation.loginRequired': 'Enter your email or phone number',
+  'validation.loginInvalid': 'Invalid email or phone number format',
+  'validation.emailInvalid': 'Enter a valid email address',
+  'validation.passwordMin': 'Password must be at least 6 characters',
+  'error.invalidCredentials': 'Incorrect login or password',
+  'error.inactive': 'Your account is inactive. Contact your administrator',
+  'error.network': "Couldn't reach the server. Try again later",
+  'error.unknown': 'Something went wrong. Try again',
+  'common.language': 'Language',
+  'common.toggleTheme': 'Toggle theme',
+  'common.logout': 'Sign out',
+  'common.loading': 'Loading...',
+  'home.greeting': 'Hi, {name}',
+  'home.placeholder': 'The dashboard will live here.',
+  'role.SUPERADMIN': 'Super admin',
+  'role.ADMIN': 'Admin',
+  'role.TEACHER': 'Teacher',
+  'role.STUDENT': 'Student',
+};
+
+export const messages: Record<Language, Record<MessageKey, string>> = { uz, ru, en };
