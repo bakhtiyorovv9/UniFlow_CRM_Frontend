@@ -23,7 +23,7 @@ import {
   useRecentLessons,
   useStudentCounts,
   useStudentsPage,
-  useTeachers,
+  useTeacherCounts,
 } from '../api';
 import { attendanceRate } from '../derive';
 import { studentStatus } from '../status';
@@ -52,7 +52,7 @@ export function DashboardPage() {
 
   const counts = useStudentCounts();
   const students = useStudentsPage({ page: 1, limit: RECENT_STUDENTS });
-  const teachers = useTeachers();
+  const teachers = useTeacherCounts();
   const groups = useGroups();
   const attendance = useAttendanceRange(weekStart, now.toISOString());
   const lessons = useRecentLessons();
@@ -73,8 +73,8 @@ export function DashboardPage() {
       newThisMonth: counts.data?.new_this_month ?? 0,
       activeGroups: activeGroups.length,
       plannedGroups: allGroups.filter((group) => group.status === 'planned').length,
-      teachersTotal: teachers.data?.length ?? 0,
-      teachersActive: (teachers.data ?? []).filter((teacher) => teacher.status === 'active').length,
+      teachersTotal: teachers.data?.all ?? 0,
+      teachersActive: teachers.data?.active ?? 0,
       seatsUsed,
       seatsTotal,
       occupancy: percent(seatsUsed, seatsTotal),

@@ -158,7 +158,7 @@ export function Avatar({
     <MuiAvatar
       aria-hidden
       src={photoUrl(photo)}
-      slotProps={{ img: { alt: '' } }}
+      slotProps={{ img: { alt: '', loading: 'lazy', decoding: 'async' } }}
       sx={{
         width: size,
         height: size,

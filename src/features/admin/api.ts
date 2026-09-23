@@ -27,12 +27,24 @@ export type Teacher = {
   archived_at: string | null;
 };
 
+export type AttendanceTally = { present: number; total: number };
+
+export type TeacherRow = Teacher & {
+  groups_count: number;
+  students_count: number;
+  courses: string[];
+  attendance: AttendanceTally;
+};
+
+export type TeacherCounts = { all: number; active: number; inactive: number; freeze: number; archived: number };
+
 export type StudentGroupLink = { id: number; group_id: number; groups: { id: number; name: string } };
 
 export type Student = Omit<Teacher, 'status'> & {
   birth_date: string;
   status: StudentStatus;
   studentGroups?: StudentGroupLink[];
+  attendance?: AttendanceTally;
 };
 
 export type StudentCounts = {
@@ -211,6 +223,25 @@ export const useTeachers = (archived = false, enabled = true) =>
     enabled,
   });
 
+export const useTeachersPage = (params: {
+  page: number;
+  limit: number;
+  search?: string;
+  status?: Status;
+  archived?: boolean;
+}) =>
+  useQuery({
+    queryKey: [...keys.teachers, 'page', params],
+    queryFn: () => fetchPage<TeacherRow>('/teachers', { ...params, archived: archivedParam(Boolean(params.archived)) }),
+    placeholderData: keepPreviousData,
+  });
+
+export const useTeacherCounts = () =>
+  useQuery({
+    queryKey: [...keys.teachers, 'counts'],
+    queryFn: async () => (await api.get<TeacherCounts>('/teachers/counts')).data,
+  });
+
 export const useAllStudents = () =>
   useQuery({ queryKey: [...keys.students, 'all'], queryFn: () => fetchAll<Student>('/students') });
 
@@ -283,12 +314,6 @@ export const useAttendanceRange = (from: string, to: string) =>
     queryFn: () => fetchAll<Attendance>('/attendance', { from, to }),
   });
 
-export const useTeacherCount = (archived = false) =>
-  useQuery({
-    queryKey: [...keys.teachers, 'count', archived ? 'archived' : 'current'],
-    queryFn: async () =>
-      (await fetchPage<Teacher>('/teachers', { archived: archivedParam(archived), page: 1, limit: 1 })).total,
-  });
 
 export const useRecentLessons = () =>
   useQuery({

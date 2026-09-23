@@ -1,7 +1,7 @@
 'use client';
 
 import { Archive, ArrowLeft, Download, Pencil, Plus, Wallet } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useI18n } from '../../../i18n/I18nProvider';
 import { formatPhone, percent, toDateInput } from '../../../lib/format';
 import { notify } from '../../../lib/notify';
@@ -10,7 +10,6 @@ import { ArchiveButton, ArchiveTable, useArchiveView } from '../archive';
 import {
   fetchAll,
   useArchiveAction,
-  useAttendanceSummary,
   useDeleteEntity,
   useStudentCounts,
   useStudentsPage,
@@ -75,12 +74,6 @@ export function StudentsPage() {
   });
   const counts = useStudentCounts().data;
   const archivedCount = counts?.archived;
-  const attendance = useAttendanceSummary('student');
-
-  const attendanceByStudent = useMemo(
-    () => new Map((attendance.data ?? []).map((row) => [row.id, percent(row.present, row.total)])),
-    [attendance.data],
-  );
 
   const items = students.data?.items ?? [];
   const total = students.data?.total ?? 0;
@@ -266,7 +259,7 @@ export function StudentsPage() {
               {items.map((student, index) => {
                 const meta = studentStatus[student.status];
                 const groups = groupNames(student);
-                const rate = attendanceByStudent.get(student.id) ?? null;
+                const rate = percent(student.attendance?.present ?? 0, student.attendance?.total ?? 0);
                 return (
                   <Tr key={student.id}>
                     <Td className="text-muted">{from + index}</Td>

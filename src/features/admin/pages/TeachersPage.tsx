@@ -1,18 +1,16 @@
 'use client';
 
 import { Archive, ArrowLeft, Pencil, Plus } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useI18n } from '../../../i18n/I18nProvider';
 import { formatPhone, percent } from '../../../lib/format';
 import { useAdminDialogs } from '../AdminDialogs';
 import { ArchiveButton, ArchiveTable, useArchiveView } from '../archive';
 import {
   useArchiveAction,
-  useAttendanceSummary,
   useDeleteEntity,
-  useGroups,
-  useTeacherCount,
-  useTeachers,
+  useTeacherCounts,
+  useTeachersPage,
   type Status,
   type Teacher,
 } from '../api';
@@ -25,6 +23,7 @@ import {
   ConfirmDialog,
   FilterChips,
   PageHeader,
+  Pagination,
   ProgressBar,
   RowMenu,
   SearchInput,
@@ -37,70 +36,47 @@ import {
   Th,
   Tr,
 } from '../ui';
-import { useUrlState } from '../useUrlState';
+import { useDebouncedUrlSearch, useUrlState } from '../useUrlState';
 
 type Filter = 'all' | Status;
 
-function matches(teacher: Teacher, query: string) {
-  const q = query.trim().toLowerCase();
-  if (!q) return true;
-  return [teacher.full_name, teacher.email, teacher.phone].some((field) => field.toLowerCase().includes(q));
-}
+const PAGE_SIZE = 10;
 
 export function TeachersPage() {
   const { t } = useI18n();
   const { openTeacherForm } = useAdminDialogs();
   const [filter, setFilter] = useUrlState<Filter>('status', 'all');
-  const [query, setQuery] = useUrlState('q', '');
+  const { query, input: searchInput, setInput: setSearchInput } = useDebouncedUrlSearch();
+  const [pageParam, setPageParam] = useUrlState('page', '1');
   const [view, setView] = useArchiveView();
   const [toArchive, setToArchive] = useState<Teacher | null>(null);
   const [toDelete, setToDelete] = useState<Teacher | null>(null);
   const remove = useDeleteEntity('/teachers');
   const archiveAction = useArchiveAction('/teachers');
+  const isArchive = view === 'archive';
 
-  const teachers = useTeachers();
-  const archivedCount = useTeacherCount(true).data;
-  const groups = useGroups();
-  const attendance = useAttendanceSummary('group');
+  const page = Math.max(1, Number(pageParam) || 1);
+  const teachers = useTeachersPage({
+    page,
+    limit: PAGE_SIZE,
+    search: query || undefined,
+    status: filter === 'all' || isArchive ? undefined : filter,
+    archived: isArchive,
+  });
+  const counts = useTeacherCounts().data;
 
-  const archived = useTeachers(true, view === 'archive');
+  const items = teachers.data?.items ?? [];
+  const total = teachers.data?.total ?? 0;
+  const pageCount = Math.ceil(total / PAGE_SIZE);
+  const from = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
 
-  const rows = useMemo(() => {
-    const attendanceByGroup = new Map((attendance.data ?? []).map((row) => [row.id, row]));
-    const allGroups = groups.data ?? [];
-    const groupsByTeacher = new Map<number, typeof allGroups>();
-    for (const group of allGroups) {
-      for (const link of group.GroupTeacher ?? []) {
-        const bucket = groupsByTeacher.get(link.Teacher.id);
-        if (bucket) bucket.push(group);
-        else groupsByTeacher.set(link.Teacher.id, [group]);
-      }
-    }
-
-    return (teachers.data ?? []).map((teacher) => {
-      const taught = groupsByTeacher.get(teacher.id) ?? [];
-      const rates = taught.map((group) => attendanceByGroup.get(group.id)).filter(Boolean);
-      return {
-        teacher,
-        courses: [...new Set(taught.map((group) => group.courses.name))].join(', '),
-        groups: taught.length,
-        students: taught.reduce((sum, group) => sum + (group._count?.studentGroups ?? 0), 0),
-        attendance: percent(
-          rates.reduce((sum, row) => sum + (row?.present ?? 0), 0),
-          rates.reduce((sum, row) => sum + (row?.total ?? 0), 0),
-        ),
-      };
-    });
-  }, [teachers.data, groups.data, attendance.data]);
-
-  const counts = useMemo(() => {
-    const result: Record<Filter, number> = { all: rows.length, active: 0, freeze: 0, inactive: 0 };
-    rows.forEach(({ teacher }) => result[teacher.status]++);
-    return result;
-  }, [rows]);
-
-  const visible = rows.filter(
-    ({ teacher }) => (filter === 'all' || teacher.status === filter) && matches(teacher, query),
+  const paginationFooter = total > 0 && (
+    <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
+      <p className="text-xs text-muted tabular-nums">
+        {from}–{from + items.length - 1} / {total}
+      </p>
+      <Pagination page={page} pageCount={pageCount} onChange={(next) => setPageParam(String(next))} />
+    </footer>
   );
 
   const confirmDialogs = (
@@ -131,13 +107,12 @@ export function TeachersPage() {
     </>
   );
 
-  if (view === 'archive') {
-    const archivedItems = (archived.data ?? []).filter((teacher) => matches(teacher, query));
+  if (isArchive) {
     return (
       <div className="space-y-5">
         <PageHeader
           title={t('archive.teachersTitle')}
-          subtitle={archivedCount !== undefined && t('archive.summary', { count: String(archivedCount) })}
+          subtitle={counts && t('archive.summary', { count: String(counts.archived) })}
           actions={
             <Button variant="secondary" icon={ArrowLeft} onClick={() => setView('list')}>
               {t('archive.back')}
@@ -145,19 +120,21 @@ export function TeachersPage() {
           }
         />
         <div className="flex justify-end">
-          <SearchInput value={query} onChange={setQuery} placeholder={t('students.searchPlaceholder')} />
+          <SearchInput value={searchInput} onChange={setSearchInput} placeholder={t('students.searchPlaceholder')} />
         </div>
         <ArchiveTable
-          items={archivedItems}
+          items={items}
           personLabel={t('col.teacher')}
-          loading={archived.isPending}
-          error={archived.isError}
-          onRetry={() => archived.refetch()}
+          startIndex={from}
+          loading={teachers.isPending}
+          error={teachers.isError}
+          onRetry={() => teachers.refetch()}
           onRestore={(teacher) => archiveAction.mutate({ id: teacher.id, action: 'restore' })}
           onDelete={(teacher) => {
             remove.reset();
             setToDelete(teacher);
           }}
+          footer={paginationFooter}
         />
         {confirmDialogs}
       </div>
@@ -168,7 +145,9 @@ export function TeachersPage() {
     <div className="space-y-5">
       <PageHeader
         title={t('nav.teachers')}
-        subtitle={teachers.data && t('teachers.summary', { total: String(counts.all), active: String(counts.active) })}
+        subtitle={
+          counts && t('teachers.summary', { total: String(counts.all), active: String(counts.active) })
+        }
         actions={
           <Button icon={Plus} onClick={() => openTeacherForm()}>
             {t('add.teacher')}
@@ -182,15 +161,15 @@ export function TeachersPage() {
           value={filter}
           onChange={setFilter}
           options={[
-            { value: 'all', label: t('filter.all'), count: counts.all },
-            { value: 'active', label: t('status.active'), count: counts.active },
-            { value: 'freeze', label: t('status.vacation'), count: counts.freeze },
-            { value: 'inactive', label: t('status.inactive'), count: counts.inactive },
+            { value: 'all', label: t('filter.all'), count: counts?.all },
+            { value: 'active', label: t('status.active'), count: counts?.active },
+            { value: 'freeze', label: t('status.vacation'), count: counts?.freeze },
+            { value: 'inactive', label: t('status.inactive'), count: counts?.inactive },
           ]}
         />
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-          <ArchiveButton count={archivedCount} onClick={() => setView('archive')} />
-          <SearchInput value={query} onChange={setQuery} placeholder={t('students.searchPlaceholder')} />
+          <ArchiveButton count={counts?.archived} onClick={() => setView('archive')} />
+          <SearchInput value={searchInput} onChange={setSearchInput} placeholder={t('students.searchPlaceholder')} />
         </div>
       </div>
 
@@ -212,30 +191,32 @@ export function TeachersPage() {
               </Tr>
             </THead>
             <TBody>
-              {visible.map((row, index) => {
-                const status = teacherStatus[row.teacher.status];
+              {items.map((teacher, index) => {
+                const status = teacherStatus[teacher.status];
+                const courses = teacher.courses.join(', ');
+                const rate = percent(teacher.attendance.present, teacher.attendance.total);
                 return (
-                  <Tr key={row.teacher.id}>
-                    <Td className="text-muted">{index + 1}</Td>
+                  <Tr key={teacher.id}>
+                    <Td className="text-muted">{from + index}</Td>
                     <Td>
                       <div className="flex items-center gap-2.5">
-                        <Avatar name={row.teacher.full_name} photo={row.teacher.photo} />
+                        <Avatar name={teacher.full_name} photo={teacher.photo} />
                         <div className="min-w-0">
-                          <p className="truncate font-semibold">{row.teacher.full_name}</p>
-                          <p className="text-xs text-muted">{formatPhone(row.teacher.phone)}</p>
+                          <p className="truncate font-semibold">{teacher.full_name}</p>
+                          <p className="text-xs text-muted">{formatPhone(teacher.phone)}</p>
                         </div>
                       </div>
                     </Td>
-                    <Td className="max-w-56 truncate text-fg/85" title={row.courses}>
-                      {row.courses || <span className="text-muted">—</span>}
+                    <Td className="max-w-56 truncate text-fg/85" title={courses}>
+                      {courses || <span className="text-muted">—</span>}
                     </Td>
-                    <Td className="font-semibold tabular-nums">{row.groups}</Td>
-                    <Td className="font-semibold tabular-nums">{row.students}</Td>
+                    <Td className="font-semibold tabular-nums">{teacher.groups_count}</Td>
+                    <Td className="font-semibold tabular-nums">{teacher.students_count}</Td>
                     <Td>
                       <div className="flex items-center gap-3">
-                        <ProgressBar value={row.attendance} className="w-full max-w-52 min-w-24" />
+                        <ProgressBar value={rate} className="w-full max-w-52 min-w-24" />
                         <span className="w-10 text-right font-semibold tabular-nums">
-                          {row.attendance === null ? '—' : `${row.attendance}%`}
+                          {rate === null ? '—' : `${rate}%`}
                         </span>
                       </div>
                     </Td>
@@ -244,15 +225,15 @@ export function TeachersPage() {
                     </Td>
                     <Td className="text-right">
                       <RowMenu
-                        label={`${t('col.actions')}: ${row.teacher.full_name}`}
+                        label={`${t('col.actions')}: ${teacher.full_name}`}
                         items={[
-                          { label: t('common.edit'), icon: Pencil, onSelect: () => openTeacherForm(row.teacher) },
+                          { label: t('common.edit'), icon: Pencil, onSelect: () => openTeacherForm(teacher) },
                           {
                             label: t('archive.action'),
                             icon: Archive,
                             onSelect: () => {
                               archiveAction.reset();
-                              setToArchive(row.teacher);
+                              setToArchive(teacher);
                             },
                           },
                         ]}
@@ -267,9 +248,10 @@ export function TeachersPage() {
         <StateMessage
           loading={teachers.isPending}
           error={teachers.isError}
-          empty={visible.length === 0}
+          empty={items.length === 0}
           onRetry={() => teachers.refetch()}
         />
+        {paginationFooter}
       </Card>
 
       {confirmDialogs}
