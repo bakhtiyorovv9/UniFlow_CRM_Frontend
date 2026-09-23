@@ -11,7 +11,7 @@ import { WEEK_DAY_SHORT, toDateInput } from '../../../lib/format';
 import {
   WEEK_DAYS,
   useCourses,
-  useGroupTeachers,
+  useGroupTeacherLinks,
   useRooms,
   useSaveGroup,
   useTeachers,
@@ -47,9 +47,9 @@ export function GroupFormDialog({ open, onClose, group }: Props) {
   const courses = useCourses();
   const rooms = useRooms();
   const teachers = useTeachers();
-  const groupTeachers = useGroupTeachers();
+  const groupTeachers = useGroupTeacherLinks({ group_id: group?.id }, Boolean(group));
 
-  const currentLink = group ? activeLinks(groupTeachers.data).find((link) => link.group_id === group.id) : undefined;
+  const currentLink = activeLinks(groupTeachers.data)[0];
 
   const [values, setValues] = useState<Values>({
     name: group?.name ?? '',

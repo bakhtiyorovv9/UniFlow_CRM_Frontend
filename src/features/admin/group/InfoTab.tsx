@@ -1,6 +1,8 @@
 'use client';
 
 import Autocomplete from '@mui/material/Autocomplete';
+import Checkbox from '@mui/material/Checkbox';
+import Chip from '@mui/material/Chip';
 import MuiAvatar from '@mui/material/Avatar';
 import MuiButton from '@mui/material/Button';
 import MuiIconButton from '@mui/material/IconButton';
@@ -22,7 +24,7 @@ import {
   percent,
 } from '../../../lib/format';
 import { ageFrom, buildStudyMonths, dayKey, lessonEndTime, type StudyMonth } from '../../../lib/schedule';
-import { WEEK_DAYS, useAllStudents, type Lesson, type StudentGroup } from '../api';
+import { WEEK_DAYS, useAllStudents, type Lesson, type Student, type StudentGroup } from '../api';
 import { studentStatus } from '../status';
 import {
   Alert,
@@ -43,7 +45,7 @@ import {
   Tr,
   apiErrorMessage,
 } from '../ui';
-import { useAddStudentToGroup, useRemoveStudentLink, type AttendanceRecord, type GroupDetail } from './groupApi';
+import { useAddStudentsToGroup, useRemoveStudentLink, type AttendanceRecord, type GroupDetail } from './groupApi';
 
 function ColoredCardHeader({ title }: { title: string }) {
   return (
@@ -394,6 +396,7 @@ export function InfoTab({
         <AddStudentDialog
           groupId={group.id}
           memberIds={new Set(studentLinks.map((link) => link.student_id))}
+          freeSlots={Math.max(0, group.max_student - studentLinks.length)}
           onClose={() => setAdding(false)}
         />
       )}
@@ -415,26 +418,28 @@ export function InfoTab({
 function AddStudentDialog({
   groupId,
   memberIds,
+  freeSlots,
   onClose,
 }: {
   groupId: number;
   memberIds: Set<number>;
+  freeSlots: number;
   onClose: () => void;
 }) {
   const { t } = useI18n();
   const students = useAllStudents();
-  const add = useAddStudentToGroup();
-  const [studentId, setStudentId] = useState<number | null>(null);
+  const add = useAddStudentsToGroup();
+  const [selected, setSelected] = useState<Student[]>([]);
   const options = (students.data ?? [])
     .filter((student) => !memberIds.has(student.id) && student.status === 'active')
     .sort((a, b) => a.full_name.localeCompare(b.full_name));
+  const tooMany = selected.length > freeSlots;
 
   return (
     <Dialog
       open
       onClose={onClose}
-      size="sm"
-      title={t('groupStudents.add')}
+      title={t('groupStudents.addMany')}
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
@@ -442,44 +447,57 @@ function AddStudentDialog({
           </Button>
           <Button
             loading={add.isPending}
-            disabled={!studentId}
+            disabled={selected.length === 0 || tooMany}
             onClick={() =>
-              studentId && add.mutate({ student_id: studentId, group_id: groupId }, { onSuccess: onClose })
+              add.mutate({ groupId, studentIds: selected.map((student) => student.id) }, { onSuccess: onClose })
             }
           >
-            {t('common.save')}
+            {selected.length > 1 ? `${t('common.save')} (${selected.length})` : t('common.save')}
           </Button>
         </>
       }
     >
       <div className="space-y-3">
         {add.error ? <Alert>{apiErrorMessage(add.error, t('error.unknown'))}</Alert> : null}
+        {tooMany && <Alert>{t('groupStudents.tooMany')}</Alert>}
         <Autocomplete
+          multiple
+          disableCloseOnSelect
           size="small"
           options={options}
           loading={students.isPending}
-          value={options.find((student) => student.id === studentId) ?? null}
-          onChange={(_, student) => setStudentId(student?.id ?? null)}
+          value={selected}
+          onChange={(_, value) => setSelected(value)}
           getOptionLabel={(student) => student.full_name}
           isOptionEqualToValue={(option, value) => option.id === value.id}
-          renderOption={({ key, ...props }, student) => (
+          renderOption={({ key, ...props }, student, { selected: isSelected }) => (
             <li key={key} {...props}>
-              <div className="flex w-full items-center justify-between gap-3">
-                <span className="font-medium">{student.full_name}</span>
-                <span className="text-xs text-muted">{student.phone}</span>
+              <div className="flex w-full items-center gap-2.5">
+                <Checkbox size="small" checked={isSelected} sx={{ p: 0.5 }} />
+                <span className="min-w-0 flex-1 truncate font-medium">{student.full_name}</span>
+                <span className="shrink-0 text-xs text-muted">{student.phone}</span>
               </div>
             </li>
           )}
-          noOptionsText={t('search.empty')}
+          renderValue={(value, getItemProps) =>
+            value.map((student, index) => {
+              const { key, ...chipProps } = getItemProps({ index });
+              return <Chip key={key} {...chipProps} size="small" label={student.full_name} />;
+            })
+          }
+          noOptionsText={options.length === 0 ? t('groupStudents.noneLeft') : t('search.empty')}
           loadingText={t('common.loading')}
           renderInput={(params) => (
             <MuiTextField
               {...params}
               autoFocus
-              placeholder={t('groupStudents.select')}
+              placeholder={selected.length ? undefined : t('groupStudents.selectMany')}
+              helperText={`${t('groupStudents.freeSlots', { n: String(Math.max(0, freeSlots - selected.length)) })}${
+                selected.length ? ` · ${t('groupStudents.selected', { n: String(selected.length) })}` : ''
+              }`}
               slotProps={{
                 ...params.slotProps,
-                htmlInput: { ...params.slotProps.htmlInput, 'aria-label': t('groupStudents.select') },
+                htmlInput: { ...params.slotProps.htmlInput, 'aria-label': t('groupStudents.selectMany') },
               }}
             />
           )}

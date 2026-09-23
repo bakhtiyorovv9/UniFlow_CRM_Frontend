@@ -211,6 +211,13 @@ export const teacherUz = {
   'exam.timeOver': 'Vaqt tugagan',
   'nav.plannedShort': "Yig'ilayotgan",
   'nav.bottom': 'Asosiy menyu',
+  'groupStudents.addMany': "Talabalarni qo'shish",
+  'groupStudents.selectMany': 'Bir yoki bir nechta talabani tanlang',
+  'groupStudents.freeSlots': "Bo'sh o'rin: {n}",
+  'groupStudents.selected': '{n} ta tanlandi',
+  'groupStudents.tooMany': "Tanlangan talabalar soni bo'sh o'rindan ko'p",
+  'groupStudents.noneLeft': "Qo'shish uchun talaba qolmadi",
+  'notify.studentsAddedToGroup': "{n} ta talaba guruhga qo'shildi",
 };
 
 type TeacherKey = keyof typeof teacherUz;
@@ -425,6 +432,13 @@ export const teacherRu: Record<TeacherKey, string> = {
   'exam.timeOver': 'Время вышло',
   'nav.plannedShort': 'Набор',
   'nav.bottom': 'Главное меню',
+  'groupStudents.addMany': 'Добавить учеников',
+  'groupStudents.selectMany': 'Выберите одного или нескольких учеников',
+  'groupStudents.freeSlots': 'Свободных мест: {n}',
+  'groupStudents.selected': 'Выбрано: {n}',
+  'groupStudents.tooMany': 'Выбрано больше, чем свободных мест',
+  'groupStudents.noneLeft': 'Нет учеников для добавления',
+  'notify.studentsAddedToGroup': '{n} учеников добавлено в группу',
 };
 
 export const teacherEn: Record<TeacherKey, string> = {
@@ -638,4 +652,11 @@ export const teacherEn: Record<TeacherKey, string> = {
   'exam.timeOver': 'Time is over',
   'nav.plannedShort': 'Enrolling',
   'nav.bottom': 'Main menu',
+  'groupStudents.addMany': 'Add students',
+  'groupStudents.selectMany': 'Pick one or more students',
+  'groupStudents.freeSlots': 'Free places: {n}',
+  'groupStudents.selected': '{n} selected',
+  'groupStudents.tooMany': 'More students selected than free places',
+  'groupStudents.noneLeft': 'No students left to add',
+  'notify.studentsAddedToGroup': '{n} students added to the group',
 };

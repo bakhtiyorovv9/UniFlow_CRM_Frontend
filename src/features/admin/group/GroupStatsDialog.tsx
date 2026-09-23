@@ -5,7 +5,7 @@ import { useI18n } from '../../../i18n/I18nProvider';
 import { percent } from '../../../lib/format';
 import type { Lesson } from '../api';
 import { Avatar, DataTable, Dialog, ProgressBar, StateMessage, TBody, THead, Td, Th, Tr } from '../ui';
-import { useGroupHomeworks, useHomeworkAnswers, type AttendanceRecord, type GroupDetail } from './groupApi';
+import { useGroupAnswers, useGroupHomeworks, type AttendanceRecord, type GroupDetail } from './groupApi';
 
 export function GroupStatsDialog({
   group,
@@ -20,7 +20,7 @@ export function GroupStatsDialog({
 }) {
   const { t } = useI18n();
   const homeworks = useGroupHomeworks(group.id);
-  const answers = useHomeworkAnswers();
+  const answers = useGroupAnswers(group.id);
 
   const stats = useMemo(() => {
     const students = group.studentGroups

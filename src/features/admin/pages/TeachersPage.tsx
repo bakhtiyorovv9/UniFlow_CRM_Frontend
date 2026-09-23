@@ -3,20 +3,19 @@
 import { Archive, ArrowLeft, Pencil, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useI18n } from '../../../i18n/I18nProvider';
-import { formatPhone } from '../../../lib/format';
+import { formatPhone, percent } from '../../../lib/format';
 import { useAdminDialogs } from '../AdminDialogs';
 import { ArchiveButton, ArchiveTable, useArchiveView } from '../archive';
 import {
   useArchiveAction,
-  useAttendance,
+  useAttendanceSummary,
   useDeleteEntity,
-  useGroupTeachers,
-  useStudentGroups,
+  useGroups,
+  useTeacherCount,
   useTeachers,
   type Status,
   type Teacher,
 } from '../api';
-import { attendanceBy, attendanceRate, studentLinksByGroup, teacherLinksByTeacher } from '../derive';
 import { teacherStatus } from '../status';
 import {
   Badge,
@@ -60,28 +59,39 @@ export function TeachersPage() {
   const archiveAction = useArchiveAction('/teachers');
 
   const teachers = useTeachers();
-  const archived = useTeachers(true);
-  const groupTeachers = useGroupTeachers();
-  const studentGroups = useStudentGroups();
-  const attendance = useAttendance();
+  const archivedCount = useTeacherCount(true).data;
+  const groups = useGroups();
+  const attendance = useAttendanceSummary('group');
+
+  const archived = useTeachers(true, view === 'archive');
 
   const rows = useMemo(() => {
-    const byTeacher = teacherLinksByTeacher(groupTeachers.data);
-    const studentsByGroup = studentLinksByGroup(studentGroups.data);
-    const attendanceByGroup = attendanceBy(attendance.data, 'group_id');
+    const attendanceByGroup = new Map((attendance.data ?? []).map((row) => [row.id, row]));
+    const allGroups = groups.data ?? [];
+    const groupsByTeacher = new Map<number, typeof allGroups>();
+    for (const group of allGroups) {
+      for (const link of group.GroupTeacher ?? []) {
+        const bucket = groupsByTeacher.get(link.Teacher.id);
+        if (bucket) bucket.push(group);
+        else groupsByTeacher.set(link.Teacher.id, [group]);
+      }
+    }
 
     return (teachers.data ?? []).map((teacher) => {
-      const links = byTeacher.get(teacher.id) ?? [];
-      const groupIds = links.map((link) => link.group_id);
+      const taught = groupsByTeacher.get(teacher.id) ?? [];
+      const rates = taught.map((group) => attendanceByGroup.get(group.id)).filter(Boolean);
       return {
         teacher,
-        courses: [...new Set(links.map((link) => link.Group.courses.name))].join(', '),
-        groups: links.length,
-        students: groupIds.reduce((sum, id) => sum + (studentsByGroup.get(id)?.length ?? 0), 0),
-        attendance: attendanceRate(groupIds.flatMap((id) => attendanceByGroup.get(id) ?? [])),
+        courses: [...new Set(taught.map((group) => group.courses.name))].join(', '),
+        groups: taught.length,
+        students: taught.reduce((sum, group) => sum + (group._count?.studentGroups ?? 0), 0),
+        attendance: percent(
+          rates.reduce((sum, row) => sum + (row?.present ?? 0), 0),
+          rates.reduce((sum, row) => sum + (row?.total ?? 0), 0),
+        ),
       };
     });
-  }, [teachers.data, groupTeachers.data, studentGroups.data, attendance.data]);
+  }, [teachers.data, groups.data, attendance.data]);
 
   const counts = useMemo(() => {
     const result: Record<Filter, number> = { all: rows.length, active: 0, freeze: 0, inactive: 0 };
@@ -127,7 +137,7 @@ export function TeachersPage() {
       <div className="space-y-5">
         <PageHeader
           title={t('archive.teachersTitle')}
-          subtitle={archived.data && t('archive.summary', { count: String(archived.data.length) })}
+          subtitle={archivedCount !== undefined && t('archive.summary', { count: String(archivedCount) })}
           actions={
             <Button variant="secondary" icon={ArrowLeft} onClick={() => setView('list')}>
               {t('archive.back')}
@@ -179,7 +189,7 @@ export function TeachersPage() {
           ]}
         />
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-          <ArchiveButton count={archived.data?.length} onClick={() => setView('archive')} />
+          <ArchiveButton count={archivedCount} onClick={() => setView('archive')} />
           <SearchInput value={query} onChange={setQuery} placeholder={t('students.searchPlaceholder')} />
         </div>
       </div>

@@ -3,22 +3,20 @@
 import { Archive, ArrowLeft, Download, Pencil, Plus, Wallet } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useI18n } from '../../../i18n/I18nProvider';
-import { formatPhone, toDateInput } from '../../../lib/format';
+import { formatPhone, percent, toDateInput } from '../../../lib/format';
 import { notify } from '../../../lib/notify';
 import { useAdminDialogs } from '../AdminDialogs';
 import { ArchiveButton, ArchiveTable, useArchiveView } from '../archive';
 import {
   fetchAll,
   useArchiveAction,
-  useAttendance,
+  useAttendanceSummary,
   useDeleteEntity,
-  useStudentCount,
-  useStudentGroups,
+  useStudentCounts,
   useStudentsPage,
   type Student,
   type StudentStatus,
 } from '../api';
-import { attendanceBy, attendanceRate, studentLinksByStudent } from '../derive';
 import { studentStatus } from '../status';
 import {
   Avatar,
@@ -75,27 +73,21 @@ export function StudentsPage() {
     status,
     archived: isArchive,
   });
-  const archivedCount = useStudentCount(undefined, true).data;
-  const studentGroups = useStudentGroups();
-  const attendance = useAttendance();
+  const counts = useStudentCounts().data;
+  const archivedCount = counts?.archived;
+  const attendance = useAttendanceSummary('student');
 
-  const counts = {
-    all: useStudentCount().data,
-    active: useStudentCount('active').data,
-    freeze: useStudentCount('freeze').data,
-    inactive: useStudentCount('inactive').data,
-    graduated: useStudentCount('graduated').data,
-  };
-
-  const linksByStudent = useMemo(() => studentLinksByStudent(studentGroups.data), [studentGroups.data]);
-  const attendanceByStudent = useMemo(() => attendanceBy(attendance.data, 'student_id'), [attendance.data]);
+  const attendanceByStudent = useMemo(
+    () => new Map((attendance.data ?? []).map((row) => [row.id, percent(row.present, row.total)])),
+    [attendance.data],
+  );
 
   const items = students.data?.items ?? [];
   const total = students.data?.total ?? 0;
   const pageCount = Math.ceil(total / PAGE_SIZE);
   const from = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
 
-  const groupNames = (studentId: number) => (linksByStudent.get(studentId) ?? []).map((link) => link.groups.name);
+  const groupNames = (student: Student) => (student.studentGroups ?? []).map((link) => link.groups.name);
 
   async function exportCsv() {
     setExporting(true);
@@ -115,7 +107,7 @@ export function StudentsPage() {
           student.phone,
           student.email,
           toDateInput(student.birth_date),
-          groupNames(student.id).join('; '),
+          groupNames(student).join('; '),
           t(studentStatus[student.status].label),
         ]
           .map(csvCell)
@@ -138,7 +130,7 @@ export function StudentsPage() {
     }
   }
 
-  const summaryReady = counts.all !== undefined && counts.active !== undefined && counts.graduated !== undefined;
+  const summaryReady = counts !== undefined;
 
   const paginationFooter = total > 0 && (
     <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
@@ -218,9 +210,9 @@ export function StudentsPage() {
         subtitle={
           summaryReady &&
           t('students.summary', {
-            total: String(counts.all),
-            active: String(counts.active),
-            graduated: String(counts.graduated),
+            total: String(counts?.all ?? 0),
+            active: String(counts?.active ?? 0),
+            graduated: String(counts?.graduated ?? 0),
           })
         }
         actions={
@@ -241,11 +233,11 @@ export function StudentsPage() {
           value={filter}
           onChange={setFilter}
           options={[
-            { value: 'all', label: t('filter.all'), count: counts.all },
-            { value: 'active', label: t('status.active'), count: counts.active },
-            { value: 'freeze', label: t('status.freeze'), count: counts.freeze },
-            { value: 'inactive', label: t('status.inactive'), count: counts.inactive },
-            { value: 'graduated', label: t('status.graduated'), count: counts.graduated },
+            { value: 'all', label: t('filter.all'), count: counts?.all },
+            { value: 'active', label: t('status.active'), count: counts?.active },
+            { value: 'freeze', label: t('status.freeze'), count: counts?.freeze },
+            { value: 'inactive', label: t('status.inactive'), count: counts?.inactive },
+            { value: 'graduated', label: t('status.graduated'), count: counts?.graduated },
           ]}
         />
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
@@ -273,8 +265,8 @@ export function StudentsPage() {
             <TBody className={`transition-opacity ${students.isPlaceholderData ? 'opacity-60' : ''}`}>
               {items.map((student, index) => {
                 const meta = studentStatus[student.status];
-                const groups = groupNames(student.id);
-                const rate = attendanceRate(attendanceByStudent.get(student.id) ?? []);
+                const groups = groupNames(student);
+                const rate = attendanceByStudent.get(student.id) ?? null;
                 return (
                   <Tr key={student.id}>
                     <Td className="text-muted">{from + index}</Td>

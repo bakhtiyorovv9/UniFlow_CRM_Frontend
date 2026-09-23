@@ -1,13 +1,12 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
 import NextLink from 'next/link';
 import { useMemo } from 'react';
 import { stripHtml } from '../../components/RichContent';
 import { useI18n } from '../../i18n/I18nProvider';
 import type { MessageKey } from '../../i18n/messages';
 import { formatShortDate, formatTime, percent } from '../../lib/format';
-import { fetchAll, keys, useGroups, type Attendance } from '../admin/api';
+import { useAttendanceSummary, useGroups } from '../admin/api';
 import type { HomeworkAnswer } from '../admin/group/groupApi';
 import {
   Badge,
@@ -39,10 +38,7 @@ export function StudentResultsPage() {
   const { t, lang } = useI18n();
   const answers = useMyAnswers();
   const groups = useGroups();
-  const attendance = useQuery({
-    queryKey: [...keys.attendance, 'mine'],
-    queryFn: () => fetchAll<Attendance>('/attendance'),
-  });
+  const attendance = useAttendanceSummary('student');
 
   const rows = useMemo(
     () =>
@@ -54,7 +50,10 @@ export function StudentResultsPage() {
   const groupName = useMemo(() => new Map((groups.data ?? []).map((group) => [group.id, group.name])), [groups.data]);
 
   const records = attendance.data ?? [];
-  const attendanceRate = percent(records.filter((record) => record.isPresent).length, records.length);
+  const attendanceRate = percent(
+    records.reduce((sum, row) => sum + row.present, 0),
+    records.reduce((sum, row) => sum + row.total, 0),
+  );
   const accepted = rows.filter((row) => row.homeworkStatus === 'ACCEPTED' || row.homeworkStatus === 'CHECKED').length;
   const grades = rows.map((row) => row.homeworkResults?.[0]?.grade).filter((grade): grade is number => grade != null);
   const avgGrade = grades.length ? Math.round(grades.reduce((sum, grade) => sum + grade, 0) / grades.length) : null;

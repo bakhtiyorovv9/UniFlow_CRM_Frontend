@@ -55,7 +55,7 @@ import {
   useDeleteGroupItem,
   useGroupHomeworks,
   useGroupVideos,
-  useHomeworkAnswers,
+  useGroupAnswers,
   useUploadVideo,
   type Homework,
 } from './groupApi';
@@ -293,7 +293,7 @@ function LessonDialog({ groupId, onClose }: { groupId: number; onClose: () => vo
 function HomeworkSection({ groupId, lessons }: { groupId: number; lessons: Lesson[] }) {
   const { t, lang } = useI18n();
   const homeworks = useGroupHomeworks(groupId);
-  const answers = useHomeworkAnswers();
+  const answers = useGroupAnswers(groupId);
   const router = useRouter();
   const [viewing, setViewing] = useState<Homework | null>(null);
   const [toDelete, setToDelete] = useState<Homework | null>(null);

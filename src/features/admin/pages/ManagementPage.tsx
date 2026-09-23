@@ -22,7 +22,6 @@ import { MANAGEMENT_ITEMS } from '../management-nav';
 import {
   useCourses,
   useDeleteEntity,
-  useGroups,
   usePaymentSum,
   usePaymentsPage,
   useRooms,
@@ -125,14 +124,7 @@ export function CoursesTab() {
   const { t, lang } = useI18n();
   const { openCourseForm } = useAdminDialogs();
   const courses = useCourses();
-  const groups = useGroups();
   const del = useDeleteState<Course>('/courses');
-
-  const groupCount = useMemo(() => {
-    const counts = new Map<number, number>();
-    groups.data?.forEach((group) => counts.set(group.course_id, (counts.get(group.course_id) ?? 0) + 1));
-    return counts;
-  }, [groups.data]);
 
   const items = courses.data ?? [];
 
@@ -184,7 +176,7 @@ export function CoursesTab() {
                         hours: String(course.duration_hours),
                       })}
                     </Td>
-                    <Td className="font-semibold tabular-nums">{groupCount.get(course.id) ?? 0}</Td>
+                    <Td className="font-semibold tabular-nums">{course._count?.groups ?? 0}</Td>
                     <Td>
                       <Badge tone={status.tone}>{t(status.label)}</Badge>
                     </Td>
@@ -226,16 +218,7 @@ export function RoomsTab() {
   const { t } = useI18n();
   const { openRoomForm } = useAdminDialogs();
   const rooms = useRooms();
-  const groups = useGroups();
   const del = useDeleteState<Room>('/rooms');
-
-  const groupCount = useMemo(() => {
-    const counts = new Map<number, number>();
-    groups.data
-      ?.filter((group) => group.status === 'active' || group.status === 'planned')
-      .forEach((group) => counts.set(group.room_id, (counts.get(group.room_id) ?? 0) + 1));
-    return counts;
-  }, [groups.data]);
 
   const items = rooms.data ?? [];
 
@@ -273,7 +256,7 @@ export function RoomsTab() {
                   <Tr key={room.id}>
                     <Td className="font-semibold">{room.name}</Td>
                     <Td className="text-fg/85">{t('room.capacity', { count: String(room.capacity) })}</Td>
-                    <Td className="font-semibold tabular-nums">{groupCount.get(room.id) ?? 0}</Td>
+                    <Td className="font-semibold tabular-nums">{room._count?.groups ?? 0}</Td>
                     <Td>
                       <Badge tone={status.tone}>{t(status.label)}</Badge>
                     </Td>

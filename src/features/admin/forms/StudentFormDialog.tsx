@@ -7,7 +7,7 @@ import { toDateInput } from '../../../lib/format';
 import {
   useGroups,
   useSaveStudent,
-  useStudentGroups,
+  useStudentGroupLinks,
   type Student,
   type StudentInput,
   type StudentStatus,
@@ -17,7 +17,7 @@ import { studentStatus } from '../status';
 import { PhotoField } from './PhotoField';
 import { SendEmailField } from './SendEmailField';
 import { Alert, Button, Dialog, SelectField, TextField, apiErrorMessage } from '../ui';
-import { EMAIL_PATTERN, compact, required } from './validation';
+import { EMAIL_PATTERN, compact, normalizePhone, phoneError, required } from './validation';
 
 type Props = { open: boolean; onClose: () => void; student?: Student };
 
@@ -28,11 +28,9 @@ export function StudentFormDialog({ open, onClose, student }: Props) {
   const { t } = useI18n();
   const save = useSaveStudent();
   const groups = useGroups();
-  const studentGroups = useStudentGroups();
+  const studentGroups = useStudentGroupLinks({ student_id: student?.id }, Boolean(student));
 
-  const currentLink = student
-    ? activeLinks(studentGroups.data).find((link) => link.student_id === student.id)
-    : undefined;
+  const currentLink = activeLinks(studentGroups.data)[0];
 
   const [sendEmail, setSendEmail] = useState(true);
   const [values, setValues] = useState<Values>({
@@ -62,7 +60,7 @@ export function StudentFormDialog({ open, onClose, student }: Props) {
   function validate(): Errors {
     const result: Errors = {
       full_name: required(values.full_name),
-      phone: required(values.phone),
+      phone: phoneError(values.phone),
       email:
         required(values.email) ?? (EMAIL_PATTERN.test(values.email.trim()) ? undefined : 'validation.emailInvalid'),
       address: required(values.address),
@@ -81,7 +79,7 @@ export function StudentFormDialog({ open, onClose, student }: Props) {
 
     const input: StudentInput = {
       full_name: values.full_name.trim(),
-      phone: values.phone.trim(),
+      phone: normalizePhone(values.phone.trim()),
       email: values.email.trim(),
       address: values.address.trim(),
       birth_date: values.birth_date,

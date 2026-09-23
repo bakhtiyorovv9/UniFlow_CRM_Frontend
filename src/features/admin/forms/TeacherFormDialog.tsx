@@ -7,12 +7,12 @@ import MuiTextField from '@mui/material/TextField';
 import { useMemo, useState, type FormEvent } from 'react';
 import { useI18n } from '../../../i18n/I18nProvider';
 import type { MessageKey } from '../../../i18n/messages';
-import { useGroupTeachers, useGroups, useSaveTeacher, type Status, type Teacher, type TeacherInput } from '../api';
+import { useGroupTeacherLinks, useGroups, useSaveTeacher, type Status, type Teacher, type TeacherInput } from '../api';
 import { teacherStatus } from '../status';
 import { PhotoField } from './PhotoField';
 import { SendEmailField } from './SendEmailField';
 import { Alert, Button, Dialog, SelectField, TextField, apiErrorMessage } from '../ui';
-import { EMAIL_PATTERN, compact, required } from './validation';
+import { EMAIL_PATTERN, compact, normalizePhone, phoneError, required } from './validation';
 
 type Props = { open: boolean; onClose: () => void; teacher?: Teacher };
 
@@ -34,11 +34,8 @@ export function TeacherFormDialog({ open, onClose, teacher }: Props) {
   const [errors, setErrors] = useState<Errors>({});
 
   const groups = useGroups();
-  const groupTeachers = useGroupTeachers();
-  const links = useMemo(
-    () => (teacher ? (groupTeachers.data ?? []).filter((link) => link.teacher_id === teacher.id) : []),
-    [groupTeachers.data, teacher],
-  );
+  const groupTeachers = useGroupTeacherLinks({ teacher_id: teacher?.id }, Boolean(teacher));
+  const links = useMemo(() => groupTeachers.data ?? [], [groupTeachers.data]);
   const [groupIds, setGroupIds] = useState<number[] | null>(null);
   const selectedIds = groupIds ?? links.filter((link) => link.status === 'active').map((link) => link.group_id);
   const groupOptions = (groups.data ?? []).filter(
@@ -53,7 +50,7 @@ export function TeacherFormDialog({ open, onClose, teacher }: Props) {
   function validate(): Errors {
     const result: Errors = {
       full_name: required(values.full_name),
-      phone: required(values.phone),
+      phone: phoneError(values.phone),
       email:
         required(values.email) ?? (EMAIL_PATTERN.test(values.email.trim()) ? undefined : 'validation.emailInvalid'),
       address: required(values.address),
@@ -71,7 +68,7 @@ export function TeacherFormDialog({ open, onClose, teacher }: Props) {
 
     const input: TeacherInput = {
       full_name: values.full_name.trim(),
-      phone: values.phone.trim(),
+      phone: normalizePhone(values.phone.trim()),
       email: values.email.trim(),
       address: values.address.trim(),
       ...((teacher || values.photo) && { photo: values.photo ?? '' }),

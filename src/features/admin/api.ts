@@ -27,10 +27,25 @@ export type Teacher = {
   archived_at: string | null;
 };
 
+export type StudentGroupLink = { id: number; group_id: number; groups: { id: number; name: string } };
+
 export type Student = Omit<Teacher, 'status'> & {
   birth_date: string;
   status: StudentStatus;
+  studentGroups?: StudentGroupLink[];
 };
+
+export type StudentCounts = {
+  all: number;
+  active: number;
+  inactive: number;
+  freeze: number;
+  graduated: number;
+  archived: number;
+  new_this_month: number;
+};
+
+export type AttendanceSummary = { by: 'group' | 'student'; items: { id: number; present: number; total: number }[] };
 
 export type Course = {
   id: number;
@@ -41,9 +56,17 @@ export type Course = {
   duration_hours: number;
   status: Status;
   created_at: string;
+  _count?: { groups: number };
 };
 
-export type Room = { id: number; name: string; capacity: number; status: Status; created_at: string };
+export type Room = {
+  id: number;
+  name: string;
+  capacity: number;
+  status: Status;
+  created_at: string;
+  _count?: { groups: number };
+};
 
 export type StaffRole = 'SUPERADMIN' | 'ADMIN' | 'TEACHER' | 'STUDENT';
 
@@ -86,7 +109,7 @@ export type Group = {
   status: GroupStatus;
   week_day: WeekDay[];
   created_at: string;
-  courses: { id: number; name: string };
+  courses: { id: number; name: string; duration_month: number };
   rooms: { id: number; name: string };
   _count?: { studentGroups: number };
   GroupTeacher?: {
@@ -181,10 +204,11 @@ export const keys = {
 
 const archivedParam = (archived: boolean) => (archived ? 'true' : undefined);
 
-export const useTeachers = (archived = false) =>
+export const useTeachers = (archived = false, enabled = true) =>
   useQuery({
     queryKey: [...keys.teachers, archived ? 'archived' : 'current'],
     queryFn: () => fetchAll<Teacher>('/teachers', { archived: archivedParam(archived) }),
+    enabled,
   });
 
 export const useAllStudents = () =>
@@ -203,11 +227,10 @@ export const useStudentsPage = (params: {
     placeholderData: keepPreviousData,
   });
 
-export const useStudentCount = (status?: StudentStatus, archived = false) =>
+export const useStudentCounts = () =>
   useQuery({
-    queryKey: [...keys.students, 'count', status ?? 'all', archived ? 'archived' : 'current'],
-    queryFn: async () =>
-      (await fetchPage<Student>('/students', { status, archived: archivedParam(archived), page: 1, limit: 1 })).total,
+    queryKey: [...keys.students, 'counts'],
+    queryFn: async () => (await api.get<StudentCounts>('/students/counts')).data,
   });
 
 export const useGroups = () => useQuery({ queryKey: keys.groups, queryFn: () => fetchAll<Group>('/groups') });
@@ -234,14 +257,38 @@ export const usePaymentSum = (from: string, to: string) =>
 
 export const useStaff = () => useQuery({ queryKey: keys.staff, queryFn: () => fetchAll<Staff>('/users') });
 
-export const useGroupTeachers = () =>
-  useQuery({ queryKey: keys.groupTeachers, queryFn: () => fetchAll<GroupTeacher>('/group-teachers') });
+export const useGroupTeacherLinks = (params: { group_id?: number; teacher_id?: number }, enabled = true) =>
+  useQuery({
+    queryKey: [...keys.groupTeachers, params],
+    queryFn: () => fetchAll<GroupTeacher>('/group-teachers', params),
+    enabled,
+  });
 
-export const useStudentGroups = () =>
-  useQuery({ queryKey: keys.studentGroups, queryFn: () => fetchAll<StudentGroup>('/student-groups') });
+export const useStudentGroupLinks = (params: { group_id?: number; student_id?: number }, enabled = true) =>
+  useQuery({
+    queryKey: [...keys.studentGroups, params],
+    queryFn: () => fetchAll<StudentGroup>('/student-groups', params),
+    enabled,
+  });
 
-export const useAttendance = () =>
-  useQuery({ queryKey: keys.attendance, queryFn: () => fetchAll<Attendance>('/attendance') });
+export const useAttendanceSummary = (by: 'group' | 'student') =>
+  useQuery({
+    queryKey: [...keys.attendance, 'summary', by],
+    queryFn: async () => (await api.get<AttendanceSummary>('/attendance/summary', { params: { by } })).data.items,
+  });
+
+export const useAttendanceRange = (from: string, to: string) =>
+  useQuery({
+    queryKey: [...keys.attendance, 'range', from, to],
+    queryFn: () => fetchAll<Attendance>('/attendance', { from, to }),
+  });
+
+export const useTeacherCount = (archived = false) =>
+  useQuery({
+    queryKey: [...keys.teachers, 'count', archived ? 'archived' : 'current'],
+    queryFn: async () =>
+      (await fetchPage<Teacher>('/teachers', { archived: archivedParam(archived), page: 1, limit: 1 })).total,
+  });
 
 export const useRecentLessons = () =>
   useQuery({
@@ -249,10 +296,10 @@ export const useRecentLessons = () =>
     queryFn: async () => (await fetchPage<Lesson>('/lessons', { page: 1, limit: 100 })).items,
   });
 
-export const useLessonVideos = () =>
+export const useRecentVideos = (limit: number) =>
   useQuery({
-    queryKey: keys.lessonVideos,
-    queryFn: async () => (await api.get<LessonVideo[]>('/lesson-videos')).data,
+    queryKey: [...keys.lessonVideos, 'recent', limit],
+    queryFn: async () => (await api.get<LessonVideo[]>('/lesson-videos', { params: { limit } })).data,
   });
 
 export type TeacherInput = {

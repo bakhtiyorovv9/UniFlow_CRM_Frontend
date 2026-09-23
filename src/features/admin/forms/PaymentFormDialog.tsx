@@ -12,7 +12,7 @@ import {
   useCourses,
   useGroups,
   useSavePayment,
-  useStudentGroups,
+  useStudentGroupLinks,
   type Payment,
   type PaymentInput,
 } from '../api';
@@ -36,7 +36,6 @@ export function PaymentFormDialog({ open, onClose, payment, studentId }: Props) 
   const { t, lang } = useI18n();
   const save = useSavePayment();
   const students = useAllStudents();
-  const studentGroups = useStudentGroups();
   const groups = useGroups();
   const courses = useCourses();
 
@@ -50,6 +49,11 @@ export function PaymentFormDialog({ open, onClose, payment, studentId }: Props) 
   });
   const [groupTouched, setGroupTouched] = useState(Boolean(payment));
   const [errors, setErrors] = useState<Errors>({});
+
+  const studentGroups = useStudentGroupLinks(
+    { student_id: Number(values.student_id) || undefined },
+    Boolean(values.student_id),
+  );
 
   const studentOptions = useMemo(() => {
     const list = [...(students.data ?? [])];

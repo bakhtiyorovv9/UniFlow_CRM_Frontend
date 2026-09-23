@@ -172,10 +172,11 @@ export const useGroupDetail = (id: number) =>
     queryFn: async () => (await api.get<GroupDetail>(`/groups/${id}`)).data,
   });
 
-export const useGroupLessons = (groupId: number) =>
+export const useGroupLessons = (groupId: number, enabled = true) =>
   useQuery({
     queryKey: [...keys.lessons, 'group', groupId],
     queryFn: () => fetchAll<Lesson>('/lessons', { group_id: groupId }),
+    enabled,
   });
 
 export const useGroupHomeworks = (groupId: number) =>
@@ -184,8 +185,11 @@ export const useGroupHomeworks = (groupId: number) =>
     queryFn: () => fetchAll<Homework>('/homeworks', { group_id: groupId }),
   });
 
-export const useHomeworkAnswers = () =>
-  useQuery({ queryKey: groupKeys.answers, queryFn: () => fetchAll<HomeworkAnswer>('/homework-answers') });
+export const useGroupAnswers = (groupId: number) =>
+  useQuery({
+    queryKey: [...groupKeys.answers, 'group', groupId],
+    queryFn: () => fetchAll<HomeworkAnswer>('/homework-answers', { group_id: groupId }),
+  });
 
 export const useHomework = (id: number) =>
   useQuery({
@@ -219,13 +223,14 @@ export const useGroupVideos = (groupId: number) =>
   useQuery({
     queryKey: [...keys.lessonVideos, 'group', groupId],
     queryFn: async () =>
-      (await api.get<LessonVideo[]>('/lesson-videos')).data.filter((video) => video.group_id === groupId),
+      (await api.get<LessonVideo[]>('/lesson-videos', { params: { group_id: groupId } })).data,
   });
 
-export const useGroupAttendance = (groupId: number) =>
+export const useGroupAttendance = (groupId: number, enabled = true) =>
   useQuery({
     queryKey: [...keys.attendance, 'group', groupId],
     queryFn: () => fetchAll<AttendanceRecord>('/attendance', { group_id: groupId }),
+    enabled,
   });
 
 export function useAddStudentToGroup() {
@@ -234,6 +239,23 @@ export function useAddStudentToGroup() {
     mutationFn: (body: { student_id: number; group_id: number }) => api.post('/student-groups', body),
     onSuccess: () => {
       notify.success('notify.studentAddedToGroup');
+      return invalidate(keys.groups, keys.studentGroups);
+    },
+  });
+}
+
+export function useAddStudentsToGroup() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async ({ groupId, studentIds }: { groupId: number; studentIds: number[] }) => {
+      for (const student_id of studentIds) {
+        await api.post('/student-groups', { student_id, group_id: groupId });
+      }
+      return studentIds.length;
+    },
+    onSuccess: (count) => {
+      if (count === 1) notify.success('notify.studentAddedToGroup');
+      else notify.success('notify.studentsAddedToGroup', { n: String(count) });
       return invalidate(keys.groups, keys.studentGroups);
     },
   });

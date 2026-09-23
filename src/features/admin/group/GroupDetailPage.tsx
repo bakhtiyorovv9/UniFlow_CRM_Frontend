@@ -35,10 +35,10 @@ export function GroupDetailPage({ groupId }: { groupId: number }) {
   const { role } = useAuth();
   const canManage = role === 'ADMIN' || role === 'SUPERADMIN';
   const [tab, setTab] = useUrlState<TabKey>('tab', 'info');
-  const group = useGroupDetail(groupId);
-  const lessons = useGroupLessons(groupId);
-  const attendance = useGroupAttendance(groupId);
   const [statsOpen, setStatsOpen] = useState(false);
+  const group = useGroupDetail(groupId);
+  const lessons = useGroupLessons(groupId, statsOpen || tab === 'info' || tab === 'materials');
+  const attendance = useGroupAttendance(groupId, statsOpen || tab === 'info' || tab === 'attendance');
 
   if (!group.data) {
     return (
@@ -81,7 +81,7 @@ export function GroupDetailPage({ groupId }: { groupId: number }) {
               onClick={() =>
                 openGroupForm({
                   ...base,
-                  courses: { id: courses.id, name: courses.name },
+                  courses: { id: courses.id, name: courses.name, duration_month: courses.duration_month },
                   rooms: { id: rooms.id, name: rooms.name },
                 })
               }

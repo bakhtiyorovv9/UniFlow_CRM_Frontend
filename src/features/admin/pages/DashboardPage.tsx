@@ -17,16 +17,15 @@ import {
 import { useAuth } from '../../auth/AuthProvider';
 import {
   WEEK_DAYS,
-  useAllStudents,
-  useAttendance,
+  useAttendanceRange,
   useGroups,
-  useGroupTeachers,
-  useLessonVideos,
+  useRecentVideos,
   useRecentLessons,
-  useStudentGroups,
+  useStudentCounts,
+  useStudentsPage,
   useTeachers,
 } from '../api';
-import { attendanceRate, studentLinksByGroup, studentLinksByStudent, teacherLinksByGroup } from '../derive';
+import { attendanceRate } from '../derive';
 import { studentStatus } from '../status';
 import { Avatar, Badge, Card, CardHeader, StateMessage, type BadgeTone } from '../ui';
 
@@ -35,6 +34,9 @@ function greetingKey(hour: number): MessageKey {
   if (hour < 18) return 'greeting.day';
   return 'greeting.evening';
 }
+
+const RECENT_STUDENTS = 5;
+const ACTIVITY_ITEMS = 6;
 
 function minutesOf(time: string) {
   const [hours, minutes] = time.split(':').map(Number);
@@ -46,30 +48,29 @@ export function DashboardPage() {
   const { user } = useAuth();
   const now = useMemo(() => new Date(), []);
 
-  const students = useAllStudents();
+  const weekStart = useMemo(() => startOfWeek(now).toISOString(), [now]);
+
+  const counts = useStudentCounts();
+  const students = useStudentsPage({ page: 1, limit: RECENT_STUDENTS });
   const teachers = useTeachers();
   const groups = useGroups();
-  const groupTeachers = useGroupTeachers();
-  const studentGroups = useStudentGroups();
-  const attendance = useAttendance();
+  const attendance = useAttendanceRange(weekStart, now.toISOString());
   const lessons = useRecentLessons();
-  const videos = useLessonVideos();
+  const videos = useRecentVideos(ACTIVITY_ITEMS);
+
+  const recentStudents = students.data?.items;
 
   const firstName = user ? ('first_name' in user ? user.first_name : user.full_name.split(' ')[0]) : '';
 
   const derived = useMemo(() => {
-    const studentsByGroup = studentLinksByGroup(studentGroups.data);
     const allGroups = groups.data ?? [];
     const activeGroups = allGroups.filter((group) => group.status === 'active');
-    const seatsUsed = activeGroups.reduce((sum, group) => sum + (studentsByGroup.get(group.id)?.length ?? 0), 0);
+    const seatsUsed = activeGroups.reduce((sum, group) => sum + (group._count?.studentGroups ?? 0), 0);
     const seatsTotal = activeGroups.reduce((sum, group) => sum + group.max_student, 0);
 
-    const allStudents = students.data ?? [];
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-
     return {
-      activeStudents: allStudents.filter((student) => student.status === 'active').length,
-      newThisMonth: allStudents.filter((student) => new Date(student.created_at) >= monthStart).length,
+      activeStudents: counts.data?.active ?? 0,
+      newThisMonth: counts.data?.new_this_month ?? 0,
       activeGroups: activeGroups.length,
       plannedGroups: allGroups.filter((group) => group.status === 'planned').length,
       teachersTotal: teachers.data?.length ?? 0,
@@ -78,11 +79,11 @@ export function DashboardPage() {
       seatsTotal,
       occupancy: percent(seatsUsed, seatsTotal),
     };
-  }, [students.data, teachers.data, groups.data, studentGroups.data, now]);
+  }, [counts.data, teachers.data, groups.data]);
 
   const week = useMemo(() => {
     const monday = startOfWeek(now);
-    const records = (attendance.data ?? []).filter((record) => new Date(record.created_at) >= monday);
+    const records = attendance.data ?? [];
     const days = WEEK_DAYS.map((_, index) => {
       const day = new Date(monday);
       day.setDate(monday.getDate() + index);
@@ -94,8 +95,6 @@ export function DashboardPage() {
 
   const todayLessons = useMemo(() => {
     const todayKey = WEEK_DAYS[(now.getDay() + 6) % 7];
-    const teachersByGroup = teacherLinksByGroup(groupTeachers.data);
-    const studentsByGroup = studentLinksByGroup(studentGroups.data);
     const recordedToday = new Set(
       (lessons.data ?? [])
         .filter((lesson) => isSameDay(new Date(lesson.created_at), now))
@@ -114,25 +113,26 @@ export function DashboardPage() {
             : { label: 'lessonStatus.upcoming', tone: 'neutral' };
         return {
           group,
-          teacher: teachersByGroup.get(group.id)?.[0]?.Teacher,
-          students: studentsByGroup.get(group.id)?.length ?? 0,
+          teacher: group.GroupTeacher?.[0]?.Teacher,
+          students: group._count?.studentGroups ?? 0,
           status,
         };
       });
-  }, [groups.data, groupTeachers.data, studentGroups.data, lessons.data, now]);
+  }, [groups.data, lessons.data, now]);
 
-  const newStudents = useMemo(() => {
-    const linksByStudent = studentLinksByStudent(studentGroups.data);
-    return [...(students.data ?? [])]
-      .sort((a, b) => b.created_at.localeCompare(a.created_at))
-      .slice(0, 5)
-      .map((student) => ({ student, group: linksByStudent.get(student.id)?.[0]?.groups.name }));
-  }, [students.data, studentGroups.data]);
+  const newStudents = useMemo(
+    () =>
+      (recentStudents ?? []).map((student) => ({
+        student,
+        group: student.studentGroups?.[0]?.groups.name,
+      })),
+    [recentStudents],
+  );
 
   const activity = useMemo(() => {
     type Entry = { id: string; text: string; at: Date; tone: 'success' | 'accent' | 'muted' };
     const entries: Entry[] = [
-      ...(students.data ?? []).map((s) => ({
+      ...(recentStudents ?? []).map((s) => ({
         id: `s${s.id}`,
         text: t('activity.student', { name: s.full_name }),
         at: new Date(s.created_at),
@@ -157,8 +157,8 @@ export function DashboardPage() {
         tone: 'muted' as const,
       })),
     ];
-    return entries.sort((a, b) => b.at.getTime() - a.at.getTime()).slice(0, 6);
-  }, [students.data, groups.data, lessons.data, videos.data, t]);
+    return entries.sort((a, b) => b.at.getTime() - a.at.getTime()).slice(0, ACTIVITY_ITEMS);
+  }, [recentStudents, groups.data, lessons.data, videos.data, t]);
 
   function relativeTime(date: Date) {
     const minutes = Math.floor((now.getTime() - date.getTime()) / 60_000);
@@ -171,7 +171,7 @@ export function DashboardPage() {
     return `${formatShortDate(date, lang)}, ${formatTime(date)}`;
   }
 
-  const statsReady = students.isSuccess && groups.isSuccess && teachers.isSuccess && studentGroups.isSuccess;
+  const statsReady = counts.isSuccess && groups.isSuccess && teachers.isSuccess;
 
   const stats = [
     {

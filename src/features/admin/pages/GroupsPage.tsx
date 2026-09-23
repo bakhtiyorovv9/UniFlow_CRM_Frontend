@@ -7,17 +7,7 @@ import { useMemo, useState } from 'react';
 import { useI18n } from '../../../i18n/I18nProvider';
 import { WEEK_DAY_SHORT, addMonths, formatShortDate } from '../../../lib/format';
 import { useAdminDialogs } from '../AdminDialogs';
-import {
-  WEEK_DAYS,
-  useCourses,
-  useDeleteEntity,
-  useGroupTeachers,
-  useGroups,
-  useStudentGroups,
-  type Group,
-  type GroupStatus,
-} from '../api';
-import { studentLinksByGroup, teacherLinksByGroup } from '../derive';
+import { WEEK_DAYS, useDeleteEntity, useGroups, type Group, type GroupStatus } from '../api';
 import { groupStatus } from '../status';
 import {
   Avatar,
@@ -55,27 +45,21 @@ export function GroupsPage() {
   const isSuperadmin = role === 'SUPERADMIN';
 
   const groups = useGroups();
-  const courses = useCourses();
-  const groupTeachers = useGroupTeachers();
-  const studentGroups = useStudentGroups();
 
-  const rows = useMemo(() => {
-    const teachersByGroup = teacherLinksByGroup(groupTeachers.data);
-    const studentsByGroup = studentLinksByGroup(studentGroups.data);
-    const courseById = new Map(courses.data?.map((course) => [course.id, course]));
-
-    return (groups.data ?? []).map((group) => {
-      const course = courseById.get(group.course_id);
-      const start = new Date(group.start_date);
-      return {
-        group,
-        teacher: teachersByGroup.get(group.id)?.[0]?.Teacher,
-        students: studentsByGroup.get(group.id)?.length ?? 0,
-        start,
-        end: course ? addMonths(start, course.duration_month) : null,
-      };
-    });
-  }, [groups.data, courses.data, groupTeachers.data, studentGroups.data]);
+  const rows = useMemo(
+    () =>
+      (groups.data ?? []).map((group) => {
+        const start = new Date(group.start_date);
+        return {
+          group,
+          teacher: group.GroupTeacher?.[0]?.Teacher,
+          students: group._count?.studentGroups ?? 0,
+          start,
+          end: addMonths(start, group.courses.duration_month),
+        };
+      }),
+    [groups.data],
+  );
 
   const counts = useMemo(() => {
     const result: Record<Filter, number> = { all: rows.length, active: 0, planned: 0, completed: 0, inactive: 0 };

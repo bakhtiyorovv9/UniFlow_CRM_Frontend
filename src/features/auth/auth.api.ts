@@ -27,9 +27,16 @@ export async function login(payload: LoginPayload) {
   return data;
 }
 
-export async function fetchMe() {
-  const { data } = await api.get<CurrentUser>('/auth/me');
-  return data;
+let pendingMe: Promise<CurrentUser> | null = null;
+
+export function fetchMe() {
+  pendingMe ??= api
+    .get<CurrentUser>('/auth/me')
+    .then((response) => response.data)
+    .finally(() => {
+      pendingMe = null;
+    });
+  return pendingMe;
 }
 
 export function displayName(user: CurrentUser) {

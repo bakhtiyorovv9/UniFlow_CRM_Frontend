@@ -8,7 +8,7 @@ import { useSaveStaff, type Staff, type StaffInput, type StaffRole, type Status 
 import { resourceStatus } from '../status';
 import { PhotoField } from './PhotoField';
 import { Alert, Button, Dialog, SelectField, TextField, apiErrorMessage } from '../ui';
-import { EMAIL_PATTERN, compact, required } from './validation';
+import { EMAIL_PATTERN, compact, normalizePhone, phoneError, required } from './validation';
 
 type Props = { open: boolean; onClose: () => void; staff?: Staff };
 
@@ -46,7 +46,7 @@ export function StaffFormDialog({ open, onClose, staff }: Props) {
     const found = compact<Errors>({
       first_name: required(values.first_name),
       last_name: required(values.last_name),
-      phone: required(values.phone),
+      phone: phoneError(values.phone),
       email:
         required(values.email) ?? (EMAIL_PATTERN.test(values.email.trim()) ? undefined : 'validation.emailInvalid'),
       address: required(values.address),
@@ -62,7 +62,7 @@ export function StaffFormDialog({ open, onClose, staff }: Props) {
         input: {
           first_name: values.first_name.trim(),
           last_name: values.last_name.trim(),
-          phone: values.phone.trim(),
+          phone: normalizePhone(values.phone.trim()),
           email: values.email.trim(),
           address: values.address.trim(),
           ...((staff || values.photo) && { photo: values.photo ?? '' }),
